@@ -1,20 +1,34 @@
 class_name StateMachine
 extends Node
+## Finite state machine node that manages child [State] nodes.
 
+## Emitted when the active state changes.
 signal state_changed(new_state: State)
 
+## The initial state to use when the state machine starts.
+## If empty, the first discovered [State] child will be used.
 @export var starting_state: State
+## The Node that states should act upon.
+## If empty, defaults to the parent of this state machine.
 @export var target: Node
+## If true, the state machine starts automatically on ready.
+## If false, start it manually by calling [method state_machine_start].
 @export var auto_start: bool = true
+## If true, states will be searched recursively in all descendants, not just direct children.
 @export var find_recursive: bool = false
 
+## The currently active state (read-only).
 var active_state: State
+## The previously active state (read-only).
 var last_state: State
+## True while the state machine is running (read-only).
 var is_running: bool
+## True while the state machine is transitioning (read-only).
 var is_transitioning: bool
 
+# Internal dictionary mapping state names to state instances.
 var _states: Dictionary[StringName, State] = {}
-
+# Internal queue of pending state transitions.
 var __state_trasition_queue: Array[StateTransitionData] = []
 
 
@@ -23,6 +37,32 @@ func _ready() -> void:
 		state_machine_start()
 
 
+func _process(delta: float) -> void:
+	if not active_state:
+		return
+	active_state._state_process(delta)
+
+
+func _physics_process(delta: float) -> void:
+	if not active_state:
+		return
+	active_state._state_physics_process(delta)
+
+
+func _input(event: InputEvent) -> void:
+	if not active_state:
+		return
+	active_state._state_input(event)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not active_state:
+		return
+	active_state._state_unhandled_input(event)
+
+
+# State transitions can involve awaits (exit/enter), and we want them to run in order 
+# so states always exit, transition, and enter cleanly without overlapping.
 func __process_state_transition() -> void:
 	if is_transitioning:
 		return
@@ -38,6 +78,8 @@ func __process_state_transition() -> void:
 	is_transitioning = false
 
 
+# Internal method that performs a single state transition.
+# Exits the current state, updates references, and enters the new state.
 func __process_single_state_transition(trans: StateTransitionData) -> void:
 	var state: State = trans.state
 	var data: Dictionary = trans.data
@@ -60,6 +102,8 @@ func __process_single_state_transition(trans: StateTransitionData) -> void:
 	active_state.state_entered.emit()
 
 
+## Starts the state machine, discovering child states and transitioning to the starting state.[br]
+## [b]Param data:[/b] Optional dictionary passed to the starting [State].
 func state_machine_start(data: Dictionary = {}) -> void:
 	if is_running:
 		push_warning("[%s] StateMachine is already running" % name)
@@ -94,35 +138,15 @@ func state_machine_start(data: Dictionary = {}) -> void:
 		is_running = true
 
 
-func _process(delta: float) -> void:
-	if not active_state:
-		return
-	active_state._state_process(delta)
-
-
-func _physics_process(delta: float) -> void:
-	if not active_state:
-		return
-	active_state._state_physics_process(delta)
-
-
-func _input(event: InputEvent) -> void:
-	if not active_state:
-		return
-	active_state._state_input(event)
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if not active_state:
-		return
-	active_state._state_unhandled_input(event)
-
-
+## Transition to the state using it's Name.[br]
+## [b]Param data:[/b] Optional dictionary passed to the [State].
 func change_state_by_name(state_name: StringName, data: Dictionary = {}) -> bool:
 	var state := get_state(state_name)
 	return change_state(state, data)
 
 
+## Transition to the given [State].[br]
+## [b]Param data:[/b] Optional dictionary passed to the [State].
 func change_state(state: State, data: Dictionary = {}) -> bool:
 	if not state:
 		push_warning(
@@ -151,6 +175,7 @@ func change_state(state: State, data: Dictionary = {}) -> bool:
 	return true
 
 
+## Returns the registered state with the given name, or null if not found.
 func get_state(state_name: StringName) -> State:
 	var state: State = _states.get(state_name)
 	if not state:
