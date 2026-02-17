@@ -29,6 +29,11 @@ signal status_changed(status)
 @export var auto_start: bool = true
 ## If true, states will be searched recursively in all descendants, not just direct children.
 @export var find_recursive: bool = false
+## If true, calling [method change_state] with the same [State] as [member active_state]
+## will still enqueue a transition, causing the current [State] to run its exit/enter lifecycle
+## again. This can be useful for "restarting" a [State]. [br]
+## If false, same [State] transitions are ignored.
+@export var same_state_transition: bool = false
 
 ## Current lifecycle [enum Status] of this state machine.
 var status := Status.INITIALIZING:
@@ -184,13 +189,19 @@ func change_state(state: State, data: Dictionary = {}) -> bool:
 		)
 		return false
 
-	if active_state == state and __state_trasition_queue.is_empty():
+	if (
+		not same_state_transition and
+		active_state == state and __state_trasition_queue.is_empty()
+	):
 		push_warning(
 			"[%s] Already in state '%s', skipping state change" % [name, state.name]
 		)
 		return false
 
-	if not __state_trasition_queue.is_empty() and __state_trasition_queue.back() == state:
+	if (
+		not same_state_transition and
+		not __state_trasition_queue.is_empty() and __state_trasition_queue.back() == state
+	):
 		push_warning(
 			"[%s] State '%s' already queued for transition, skipping duplicate" %
 			[name, state.name]
