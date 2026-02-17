@@ -25,7 +25,7 @@ var last_state: State
 var is_transitioning: bool
 
 # Internal dictionary mapping state names to state instances.
-var _states: Dictionary[StringName, State] = {}
+var _state_registry: Dictionary[StringName, State] = {}
 # Internal queue of pending state transitions.
 var __state_trasition_queue: Array[StateTransitionData] = []
 
@@ -98,7 +98,7 @@ func __state_machine_init() -> void:
 		state.state_machine = self
 		state.target = target
 
-		_states[state.name] = state
+		_state_registry[state.name] = state
 
 		if not starting_state:
 			starting_state = state
@@ -186,7 +186,7 @@ func change_state(state: State, data: Dictionary = {}) -> bool:
 
 ## Returns the registered state with the given name, or null if not found.
 func get_state(state_name: StringName) -> State:
-	var state: State = _states.get(state_name)
+	var state: State = _state_registry.get(state_name)
 	if not state:
 		push_warning("[%s] %s State not found" % [name, state_name])
 	return state
