@@ -21,8 +21,6 @@ signal state_changed(new_state: State)
 var active_state: State
 ## The previously active state (read-only).
 var last_state: State
-## True while the state machine is running (read-only).
-var is_running: bool
 ## True while the state machine is transitioning (read-only).
 var is_transitioning: bool
 
@@ -33,8 +31,10 @@ var __state_trasition_queue: Array[StateTransitionData] = []
 
 
 func _ready() -> void:
+	__state_machine_init()
+
 	if auto_start:
-		state_machine_start()
+		change_state(starting_state)
 
 
 func _process(delta: float) -> void:
@@ -75,6 +75,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	active_state._state_unhandled_input(event)
+
+
+# discovering child states and register them
+func __state_machine_init() -> void:
+	if starting_state and starting_state.get_parent() != self:
+		push_error(
+			"[%s] Starting state '%s' is not a child of this StateMachine node" %
+			[name, starting_state.name]
+		)
+		return
+
+	if not target:
+		target = get_parent()
+
+	var descendant: Array = find_children("*", "", find_recursive, false)
+	for child in descendant:
+		if not child is State:
+			continue
+
+		var state := child as State
+		state.state_machine = self
+		state.target = target
+
+		_states[state.name] = state
+
+		if not starting_state:
+			starting_state = state
 
 
 # State transitions can involve awaits (exit/enter), and we want them to run in order 
@@ -118,42 +145,6 @@ func __process_single_state_transition(trans: StateTransitionData) -> void:
 	await active_state._state_enter(last_state, data)
 	active_state.state_entered.emit()
 	active_state.status = State.Status.ACTIVE
-
-
-## Starts the state machine, discovering child states and transitioning to the starting state.[br]
-## [b]Param data:[/b] Optional dictionary passed to the starting [State].
-func state_machine_start(data: Dictionary = {}) -> void:
-	if is_running:
-		push_warning("[%s] StateMachine is already running" % name)
-		return
-
-	if starting_state and starting_state.get_parent() != self:
-		push_error(
-			"[%s] Starting state '%s' is not a child of this StateMachine node" %
-			[name, starting_state.name]
-		)
-		return
-
-	if not target:
-		target = get_parent()
-
-	var descendant: Array = find_children("*", "", find_recursive, false)
-	for child in descendant:
-		if not child is State:
-			continue
-
-		var state := child as State
-		state.state_machine = self
-		state.target = target
-
-		_states[state.name] = state
-
-		if not starting_state:
-			starting_state = state
-
-	var success := change_state(starting_state)
-	if success:
-		is_running = true
 
 
 ## Transition to the state using it's Name.[br]
