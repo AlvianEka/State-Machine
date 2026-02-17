@@ -2,8 +2,21 @@ class_name StateMachine
 extends Node
 ## Finite state machine node that manages child [State] nodes.
 
+enum Status {
+	## StateMachine is registering child [State] nodes.
+	INITIALIZING,
+	## StateMachine is ready but has not started processing a state yet.
+	IDLE,
+	## StateMachine is active and able to run the current [member active_state].
+	RUNNING,
+	## StateMachine is currently processing state transitions.
+	TRANSITIONING,
+}
+
 ## Emitted when the active state changes.
 signal state_changed(new_state: State)
+## Emitted when [member State.status] changes.
+signal status_changed(status)
 
 ## The initial state to use when the state machine starts.
 ## If empty, the first discovered [State] child will be used.
@@ -17,12 +30,18 @@ signal state_changed(new_state: State)
 ## If true, states will be searched recursively in all descendants, not just direct children.
 @export var find_recursive: bool = false
 
+## Current lifecycle [enum Status] of this state machine.
+var status := Status.INITIALIZING:
+	set(value):
+		if value == status:
+			return
+		status = value
+		status_changed.emit(status)
+
 ## The currently active state (read-only).
 var active_state: State
 ## The previously active state (read-only).
 var last_state: State
-## True while the state machine is transitioning (read-only).
-var is_transitioning: bool
 
 # Internal dictionary mapping state names to state instances.
 var _state_registry: Dictionary[StringName, State] = {}
@@ -103,13 +122,15 @@ func __state_machine_init() -> void:
 		if not starting_state:
 			starting_state = state
 
+	status = Status.IDLE
+
 
 # State transitions can involve awaits (exit/enter), and we want them to run in order 
 # so states always exit, transition, and enter cleanly without overlapping.
 func __process_state_transition() -> void:
-	if is_transitioning:
+	if status == Status.TRANSITIONING:
 		return
-	is_transitioning = true
+	status = Status.TRANSITIONING
 
 	while __state_trasition_queue:
 		if not is_inside_tree():
@@ -118,7 +139,7 @@ func __process_state_transition() -> void:
 		var state_trans: StateTransitionData = __state_trasition_queue.pop_front()
 		await __process_single_state_transition(state_trans)
 
-	is_transitioning = false
+	status = Status.RUNNING
 
 
 # Internal method that performs a single state transition.
