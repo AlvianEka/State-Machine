@@ -40,24 +40,40 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not active_state:
 		return
+
+	if active_state.status != State.Status.ACTIVE:
+		return
+
 	active_state._state_process(delta)
 
 
 func _physics_process(delta: float) -> void:
 	if not active_state:
 		return
+
+	if active_state.status != State.Status.ACTIVE:
+		return
+
 	active_state._state_physics_process(delta)
 
 
 func _input(event: InputEvent) -> void:
 	if not active_state:
 		return
+
+	if active_state.status != State.Status.ACTIVE:
+		return
+
 	active_state._state_input(event)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not active_state:
 		return
+
+	if active_state.status != State.Status.ACTIVE:
+		return
+
 	active_state._state_unhandled_input(event)
 
 
