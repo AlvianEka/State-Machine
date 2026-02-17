@@ -5,13 +5,36 @@ extends Node
 ##
 ## Extend this class to create custom states that can be managed by a [StateMachine].
 
+## Lifecycle status for this state as managed by a [StateMachine].
+enum Status {
+	## The state is not the current active state.
+	## The state will not receive process, physics, or input callbacks.
+	INACTIVE,
+	## The state is currently running it's enter transition.
+	ENTERING,
+	## The state is the current active state.
+	## The state may receive process/physics/input callbacks.
+	ACTIVE,
+	## The state is currently running it's exit transition.
+	EXITING,
+}
+
 ## Emitted after [method State._state_enter] completes.
 signal state_entered
 ## Emitted after [method State._state_exit] completes.
 signal state_exited
+## Emitted when [member State.status] changes.
+signal status_changed(status: Status)
 
-## True while this State is the [member StateMachine.active_state].
-var is_active_state: bool
+## Current lifecycle [enum Status] of this state.
+## This is updated by the owning [StateMachine].
+var status := Status.INACTIVE:
+	set(value):
+		if value == status:
+			return
+		status = value
+		status_changed.emit(status)
+
 ## The StateMachine instance that owns this state.
 ## Assigned automatically when the state is registered.
 var state_machine: StateMachine

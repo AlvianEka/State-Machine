@@ -89,17 +89,19 @@ func __process_single_state_transition(trans: StateTransitionData) -> void:
 		return
 
 	if active_state:
+		active_state.status = State.Status.EXITING
 		await active_state._state_exit(state, data)
-		active_state.is_active_state = false
 		active_state.state_exited.emit()
+		active_state.status = State.Status.INACTIVE
 		last_state = active_state
 
 	active_state = state
-	active_state.is_active_state = true
 	state_changed.emit(active_state)
 
+	active_state.status = State.Status.ENTERING
 	await active_state._state_enter(last_state, data)
 	active_state.state_entered.emit()
+	active_state.status = State.Status.ACTIVE
 
 
 ## Starts the state machine, discovering child states and transitioning to the starting state.[br]
